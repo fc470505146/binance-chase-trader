@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>binance-chase-trader 项目架构阅读图</title>
+  <style>
+    :root {
+      --bg: #f5f7fa;
+      --surface: #ffffff;
+      --ink: #17202c;
+      --muted: #647285;
+      --line: #d7e0ea;
+      --blue: #1769aa;
+      --blue-soft: #e8f2fb;
+      --green: #16784f;
+      --green-soft: #eaf7f0;
+      --orange: #9a5b00;
+      --orange-soft: #fff6e5;
+      --red: #b42318;
+      --red-soft: #fff0ef;
+      --shadow: 0 8px 24px rgba(16, 24, 40, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+      line-height: 1.62;
+    }
+
+    header {
+      background: #121820;
+      color: #f8fafc;
+      border-bottom: 1px solid #263241;
+    }
+
+    .wrap {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .header-inner {
+      padding: 34px 0 28px;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: #a9b8c8;
+      font-size: 13px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    .summary {
+      max-width: 880px;
+      margin: 14px 0 0;
+      color: #d8e2ed;
+      font-size: 15px;
+    }
+
+    main {
+      padding: 26px 0 48px;
+    }
+
+    section {
+      margin: 0 0 24px;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 20px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0 0 10px;
+    }
+
+    code {
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: #eef2f6;
+      color: #132436;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.95em;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .tag.blue {
+      color: var(--blue);
+      border-color: #b8d5ee;
+      background: var(--blue-soft);
+    }
+
+    .tag.green {
+      color: var(--green);
+      border-color: #a8d8bd;
+      background: var(--green-soft);
+    }
+
+    .callout {
+      border-left: 4px solid var(--blue);
+      background: var(--blue-soft);
+      padding: 12px 14px;
+      border-radius: 6px;
+    }
+
+    .callout.warn {
+      border-left-color: var(--orange);
+      background: var(--orange-soft);
+    }
+
+    .callout.danger {
+      border-left-color: var(--red);
+      background: var(--red-soft);
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .small {
+      font-size: 13px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    th,
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      font-size: 14px;
+    }
+
+    th {
+      background: #eef3f8;
+      color: #253244;
+      font-weight: 700;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .step {
+      position: relative;
+      min-height: 118px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .step strong {
+      display: block;
+      margin-bottom: 6px;
+      color: #132436;
+    }
+
+    .step::after {
+      content: "";
+      position: absolute;
+      right: -9px;
+      top: 50px;
+      width: 16px;
+      height: 16px;
+      border-top: 2px solid #b7c3d0;
+      border-right: 2px solid #b7c3d0;
+      transform: rotate(45deg);
+      background: var(--bg);
+    }
+
+    .step:last-child::after {
+      display: none;
+    }
+
+    .tree {
+      margin: 0;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+      overflow: auto;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 13px;
+      white-space: pre;
+    }
+
+    .state-card {
+      border-left: 4px solid var(--green);
+      padding-left: 12px;
+    }
+
+    @media (max-width: 980px) {
+      .two,
+      .three,
+      .flow {
+        grid-template-columns: 1fr;
+      }
+
+      .step::after {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap header-inner">
+      <p class="eyebrow">binance-chase-trader / docs / 架构阅读图</p>
+      <h1>Go 版追单工具代码架构</h1>
+      <p class="summary">
+        这份 HTML 用来帮助阅读当前代码：从 CLI 入口进入，理解本地服务、Binance REST/WS、order window、追单状态机、本地 TP/SL 保护计划和落盘恢复之间的关系。
+      </p>
+      <div class="tags">
+        <span class="tag green">当前入口：cmd/chaser</span>
+        <span class="tag blue">默认 dry-run</span>
+        <span class="tag">本地 TCP 控制口</span>
+        <span class="tag">JSON 快照 + JSONL 事件</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="panel">
+      <h2>先读哪里</h2>
+      <div class="flow">
+        <div class="step">
+          <strong>1. CLI</strong>
+          <span class="small muted"><code>cmd/chaser/main.go</code><br>命令解析、serve/order/window/tasks/plans/cancel。</span>
+        </div>
+        <div class="step">
+          <strong>2. Config</strong>
+          <span class="small muted"><code>internal/config</code><br>环境变量、dry-run/testnet/live、状态目录。</span>
+        </div>
+        <div class="step">
+          <strong>3. Service</strong>
+          <span class="small muted"><code>internal/service</code><br>核心状态机，追单、保护、窗口都在这里串起来。</span>
+        </div>
+        <div class="step">
+          <strong>4. Binance</strong>
+          <span class="small muted"><code>internal/binance</code><br>REST 签名请求、market/user websocket。</span>
+        </div>
+        <div class="step">
+          <strong>5. Store</strong>
+          <span class="small muted"><code>internal/store</code><br>snapshot.json 和 events.jsonl。</span>
+        </div>
+        <div class="step">
+          <strong>6. Domain</strong>
+          <span class="small muted"><code>internal/domain</code><br>结构体和状态枚举，读懂数据形状。</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid two">
+      <div class="panel">
+        <h2>目录结构</h2>
+        <pre class="tree">cmd/chaser/main.go
+  CLI 入口：serve / order / window / tasks / plans / cancel
+
+internal/config/config.go
+  .env、环境变量、运行模式、本地端口、状态目录
+
+internal/control/control.go
+  本地 TCP JSON 控制协议
+
+internal/domain/models.go
+  ChaseTask、ProtectionPlan、WindowState、OrderUpdate
+
+internal/binance/client.go
+  REST 请求、签名、新下单、撤单、listenKey、限频响应头
+
+internal/binance/stream.go
+  bookTicker、markPrice、ORDER_TRADE_UPDATE
+
+internal/service/service.go
+  追单状态机、保护触发、多 plan 管理、reconcile
+
+internal/service/limiter.go
+  重挂 debounce、订单 token bucket
+
+internal/store/store.go
+  原子 JSON 快照、JSONL 事件日志
+
+docs/
+  需求确认稿和本架构说明</pre>
+      </div>
+
+      <div class="panel">
+        <h2>运行时组件</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>组件</th>
+              <th>职责</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>CLI 进程</td>
+              <td>短命令进程。把用户命令序列化成 JSON，经本地 TCP 发给常驻服务。</td>
+            </tr>
+            <tr>
+              <td>Serve 进程</td>
+              <td>常驻核心。维护行情、任务、保护计划、落盘状态，并负责实际下单/撤单。</td>
+            </tr>
+            <tr>
+              <td>Market Stream</td>
+              <td>订阅 <code>bookTicker</code> 和 <code>markPrice</code>，驱动窗口更新、追单价格判断和 TP/SL 触发。</td>
+            </tr>
+            <tr>
+              <td>User Stream</td>
+              <td>订阅 <code>ORDER_TRADE_UPDATE</code>，驱动订单状态、部分成交、完全成交和保护计划数量更新。</td>
+            </tr>
+            <tr>
+              <td>Store</td>
+              <td>写快照和事件日志。服务重启后从本地状态恢复任务和保护计划。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>命令链路</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>命令</th>
+            <th>代码入口</th>
+            <th>服务端处理</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>chaser serve</code></td>
+            <td><code>runServe()</code></td>
+            <td>创建 <code>Service</code>，启动 <code>control.Server</code>，启动行情流和用户订单流。</td>
+          </tr>
+          <tr>
+            <td><code>chaser order ...</code></td>
+            <td><code>runOrder()</code></td>
+            <td><code>Service.SubmitEntry()</code> 校验方向、创建 entry task、调用 <code>placeTask()</code>。</td>
+          </tr>
+          <tr>
+            <td><code>chaser window</code></td>
+            <td><code>runSimple("window")</code></td>
+            <td>读取 <code>WindowState</code>，包含行情、任务、保护计划、最近 tick。</td>
+          </tr>
+          <tr>
+            <td><code>chaser tasks</code></td>
+            <td><code>runSimple("tasks")</code></td>
+            <td>返回全部 <code>ChaseTask</code>。</td>
+          </tr>
+          <tr>
+            <td><code>chaser plans</code></td>
+            <td><code>runSimple("plans")</code></td>
+            <td>返回全部 <code>ProtectionPlan</code>。</td>
+          </tr>
+          <tr>
+            <td><code>chaser cancel</code></td>
+            <td><code>runCancel()</code></td>
+            <td>撤销本地 task；如果有交易所 orderId，则调用 Binance cancel。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="grid two">
+      <div class="panel">
+        <h2>核心数据模型</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>结构</th>
+              <th>含义</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>ChaseTask</code></td>
+              <td>一笔正在追的订单任务。可能是开仓 <code>ENTRY</code>，也可能是 TP/SL 触发后的平仓 <code>EXIT</code>。</td>
+            </tr>
+            <tr>
+              <td><code>ProtectionPlan</code></td>
+              <td>一笔本地逻辑仓位的保护计划。支持同一合约同方向多笔 plan，每笔有自己的固定 TP/SL。</td>
+            </tr>
+            <tr>
+              <td><code>MarketSnapshot</code></td>
+              <td>当前 bid、ask、mid、markPrice 和更新时间。</td>
+            </tr>
+            <tr>
+              <td><code>WindowState</code></td>
+              <td>面向 CLI/后续 UI 的聚合视图：行情、历史 tick、tasks、plans。</td>
+            </tr>
+            <tr>
+              <td><code>OrderUpdate</code></td>
+              <td>从 Binance 用户数据流解析出来的订单状态事件。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <h2>状态关系</h2>
+        <div class="state-card">
+          <h3>交易所侧</h3>
+          <p class="small">
+            Hedge Mode 下交易所只知道聚合持仓，例如 <code>XAGUSDT LONG = 10</code>。
+          </p>
+        </div>
+        <div class="state-card">
+          <h3>本地侧</h3>
+          <p class="small">
+            本地维护多条 <code>ProtectionPlan</code>：A 保护 3 张、B 保护 2 张、C 保护 5 张。某条 plan 触发时，只按这条 plan 的 <code>protectedQty</code> 平仓。
+          </p>
+        </div>
+        <div class="callout warn small">
+          交易所不会告诉我们“这是第几笔 LONG”。只要用户在 Binance 前端手工改仓，本地就可能无法精确归因，因此服务会进入 <code>NeedsReconcile</code> / <code>NeedsProtection</code>，避免自动猜。
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>开仓追单流程</h2>
+      <div class="flow">
+        <div class="step">
+          <strong>提交命令</strong>
+          <span class="small muted"><code>chaser order XAGUSDT BUY 3 LONG --tp 80 --sl 76</code></span>
+        </div>
+        <div class="step">
+          <strong>创建任务</strong>
+          <span class="small muted"><code>SubmitEntry()</code> 创建 <code>ENTRY</code> task。</span>
+        </div>
+        <div class="step">
+          <strong>检查并发</strong>
+          <span class="small muted">同一 symbol + positionSide 已有开仓追单则拒绝。</span>
+        </div>
+        <div class="step">
+          <strong>QUEUE 下单</strong>
+          <span class="small muted"><code>PlaceQueueLimit()</code> 使用 <code>priceMatch=QUEUE</code>。</span>
+        </div>
+        <div class="step">
+          <strong>追单</strong>
+          <span class="small muted"><code>bookTicker</code> 变化时检查是否仍在同向最优价。</span>
+        </div>
+        <div class="step">
+          <strong>成交更新</strong>
+          <span class="small muted"><code>ORDER_TRADE_UPDATE</code> 推动 filledQty 和 plan。</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>本地 TP/SL 流程</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>阶段</th>
+            <th>代码</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>部分成交</td>
+            <td><code>OnOrderUpdate()</code> -> <code>ensurePlanLocked()</code></td>
+            <td>开仓任务成交 3/10，就创建或更新一个保护 3 张的 plan。</td>
+          </tr>
+          <tr>
+            <td>继续成交</td>
+            <td><code>ensurePlanLocked()</code></td>
+            <td>成交到 5/10，就把同一 plan 的 <code>protectedQty</code> 更新为 5。</td>
+          </tr>
+          <tr>
+            <td>价格触发</td>
+            <td><code>OnMarket()</code> -> <code>triggerPlan()</code></td>
+            <td><code>markPrice</code> 到达固定 TP/SL，plan 进入 <code>TRIGGERED</code>。</td>
+          </tr>
+          <tr>
+            <td>撤剩余开仓</td>
+            <td><code>triggerPlan()</code></td>
+            <td>如果 entry task 还有剩余挂单，先取消它，避免一边平仓一边继续开仓。</td>
+          </tr>
+          <tr>
+            <td>发起平仓追单</td>
+            <td><code>triggerPlan()</code> -> <code>placeTask()</code></td>
+            <td>创建 <code>EXIT</code> task，只按该 plan 的 <code>protectedQty</code> 平仓。</td>
+          </tr>
+          <tr>
+            <td>关闭 plan</td>
+            <td><code>OnOrderUpdate()</code></td>
+            <td>平仓 task 成交后，把对应 plan 标记为 <code>CLOSED</code>。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="grid two">
+      <div class="panel">
+        <h2>限频保护</h2>
+        <p>
+          <code>configureRateLimits()</code> 启动时读取 Binance <code>exchangeInfo</code>，用 <code>CHASER_ORDER_BUDGET_RATIO</code> 算本地 token bucket。
+        </p>
+        <p>
+          REST 请求后，<code>internal/binance/client.go</code> 会记录响应头里的 <code>X-MBX-ORDER-COUNT-10S</code>、<code>X-MBX-ORDER-COUNT-1M</code>、<code>X-MBX-USED-WEIGHT-1M</code>。如果接近阈值，<code>adaptOrderBudget()</code> 会降速。
+        </p>
+      </div>
+
+      <div class="panel">
+        <h2>落盘恢复</h2>
+        <p>
+          <code>Store.Save()</code> 写原子快照 <code>snapshot.json</code>；<code>Store.Append()</code> 追加事件到 <code>events.jsonl</code>。
+        </p>
+        <p>
+          <code>Service.New()</code> 启动时读取快照，恢复 markets、history、tasks、plans，并重建 client order id 和 exchange order id 索引。
+        </p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>改代码时的抓手</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>想改什么</th>
+            <th>优先看哪里</th>
+            <th>注意点</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>改 CLI 参数</td>
+            <td><code>cmd/chaser/main.go</code></td>
+            <td>服务端协议也可能要跟着改 <code>internal/control</code>。</td>
+          </tr>
+          <tr>
+            <td>改 TP/SL 触发规则</td>
+            <td><code>triggerType()</code>、<code>triggerPlan()</code></td>
+            <td>固定价格、移动止损、ATR 未来都应该先扩 <code>ProtectionPlan</code>。</td>
+          </tr>
+          <tr>
+            <td>改多笔保护归因</td>
+            <td><code>ensurePlanLocked()</code>、<code>OnOrderUpdate()</code></td>
+            <td>交易所侧是聚合持仓，本地只能可靠归因自己发出的 task。</td>
+          </tr>
+          <tr>
+            <td>改追单频率</td>
+            <td><code>ReplaceLimiter</code>、<code>TokenBucket</code></td>
+            <td>不要只改间隔，必须考虑 Binance 订单限频和响应头。</td>
+          </tr>
+          <tr>
+            <td>改状态文件格式</td>
+            <td><code>internal/store/store.go</code></td>
+            <td>要考虑旧快照兼容和崩溃时原子写入。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

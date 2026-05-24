@@ -1,0 +1,980 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Order Window Go 重构需求确认稿</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --surface: #ffffff;
+      --surface-soft: #f0f3f7;
+      --text: #18202a;
+      --muted: #667382;
+      --line: #d9e0e8;
+      --accent: #1769aa;
+      --accent-soft: #e7f1fb;
+      --ok: #197b4d;
+      --warn: #9a5b00;
+      --danger: #b42318;
+      --shadow: 0 8px 24px rgba(16, 24, 40, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+      line-height: 1.62;
+    }
+
+    header {
+      background: #121820;
+      color: #f7f9fc;
+      border-bottom: 1px solid #263241;
+    }
+
+    .header-inner {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 34px 0 28px;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: #a9b8c8;
+      font-size: 13px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 30px;
+      letter-spacing: 0;
+      line-height: 1.25;
+    }
+
+    .summary {
+      max-width: 880px;
+      margin: 14px 0 0;
+      color: #d8e2ed;
+      font-size: 15px;
+    }
+
+    main {
+      width: min(1180px, calc(100% - 40px));
+      margin: 26px auto 48px;
+    }
+
+    section {
+      margin: 0 0 24px;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 20px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0 0 10px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .grid.two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .grid.three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    .panel.soft {
+      background: var(--surface-soft);
+      box-shadow: none;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .tag.primary {
+      color: var(--accent);
+      border-color: #b8d5ee;
+      background: var(--accent-soft);
+    }
+
+    .tag.warn {
+      color: var(--warn);
+      border-color: #f0cf93;
+      background: #fff6e5;
+    }
+
+    .tag.ok {
+      color: var(--ok);
+      border-color: #a8d8bd;
+      background: #ecf8f1;
+    }
+
+    .tag.open {
+      color: #4b5563;
+      border-color: #cfd8e3;
+      background: #f7f9fb;
+    }
+
+    .tag.danger {
+      color: var(--danger);
+      border-color: #f2b8b5;
+      background: #fff0ef;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .small {
+      font-size: 13px;
+    }
+
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--accent-soft);
+      padding: 12px 14px;
+      border-radius: 6px;
+    }
+
+    .callout.warn {
+      border-left-color: var(--warn);
+      background: #fff6e5;
+    }
+
+    .callout.danger {
+      border-left-color: var(--danger);
+      background: #fff0ef;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    th,
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      font-size: 14px;
+    }
+
+    th {
+      background: #eef3f8;
+      color: #253244;
+      font-weight: 700;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    code {
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: #eef2f6;
+      color: #132436;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.95em;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .step {
+      position: relative;
+      min-height: 106px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .step strong {
+      display: block;
+      margin-bottom: 6px;
+      color: #132436;
+    }
+
+    .step::after {
+      content: "";
+      position: absolute;
+      right: -9px;
+      top: 46px;
+      width: 16px;
+      height: 16px;
+      border-top: 2px solid #b7c3d0;
+      border-right: 2px solid #b7c3d0;
+      transform: rotate(45deg);
+      background: var(--bg);
+    }
+
+    .step:last-child::after {
+      display: none;
+    }
+
+    .mock-window {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 14px;
+    }
+
+    .metric-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .metric {
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .metric b {
+      display: block;
+      margin-top: 4px;
+      font-size: 16px;
+    }
+
+    .checklist {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    label.check {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      min-height: 48px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    label.check.confirmed {
+      border-color: #a8d8bd;
+      background: #f2fbf5;
+    }
+
+    label.check.open {
+      border-color: #f0cf93;
+      background: #fffaf0;
+    }
+
+    label.check input {
+      margin-top: 5px;
+      accent-color: var(--accent);
+    }
+
+    .status-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 12px 0 0;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #eef3f8;
+      color: #253244;
+      font-size: 14px;
+    }
+
+    .decision {
+      border-left: 4px solid #8392a5;
+      padding-left: 12px;
+    }
+
+    .decision.required {
+      border-left-color: var(--danger);
+    }
+
+    .decision.recommend {
+      border-left-color: var(--ok);
+    }
+
+    .decision.open {
+      border-left-color: var(--warn);
+    }
+
+    @media (max-width: 920px) {
+      .grid.two,
+      .grid.three,
+      .mock-window,
+      .metric-row,
+      .checklist,
+      .flow {
+        grid-template-columns: 1fr;
+      }
+
+      .step::after {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <p class="eyebrow">binance-chase-trader / docs / 需求确认稿</p>
+      <h1>Order Window + Go 同向价追单工具重构</h1>
+      <p class="summary">
+        本页用于在正式写 Go 代码之前确认需求边界：需要维护实时 order window 数据，内置同向最优价下单工具，并把止盈止损改成本地实时价格监控触发，而不是使用 Binance 条件单。
+      </p>
+      <div class="tag-row">
+        <span class="tag ok">状态：已确认核心边界</span>
+        <span class="tag">目标语言：Go</span>
+        <span class="tag">交易所：Binance USD-M Futures</span>
+        <span class="tag warn">剩余为实现细节选择</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="grid two">
+      <div class="panel">
+        <h2>当前工具基线</h2>
+        <p>
+          现有 Python 版本由 <code>daemon.py</code> 维护 <code>@bookTicker</code> 实时盘口和滑动窗口，<code>trader.py</code> 负责下 <code>priceMatch=QUEUE</code> 限价单、轮询订单变化、价格变化时撤单重挂。
+        </p>
+        <p>
+          当前止盈止损逻辑会在成交后调用 Binance <code>algoOrder</code> 创建条件单；这与新需求不同，新需求要求由本地进程持续监控实时价格，触发后再发起同向价追单平仓。
+        </p>
+      </div>
+
+      <div class="panel">
+        <h2>重构目标</h2>
+        <p>
+          新工具建议收敛为一个 Go 长驻进程：同时管理行情、订单窗口、主动追单任务、持仓保护任务和本地状态恢复。CLI 或后续 UI 只作为控制入口，不直接承担追单循环。
+        </p>
+        <div class="tag-row">
+          <span class="tag primary">实时行情</span>
+          <span class="tag primary">订单窗口</span>
+          <span class="tag primary">同向价追单</span>
+          <span class="tag primary">本地止盈止损</span>
+          <span class="tag primary">状态恢复</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>目标运行链路</h2>
+      <div class="flow">
+        <div class="step">
+          <strong>1. Market Stream</strong>
+          <span class="small muted">订阅 <code>bookTicker</code>，维护 bid / ask / mid / age 和最近窗口。</span>
+        </div>
+        <div class="step">
+          <strong>2. Order Window</strong>
+          <span class="small muted">合并本地意图、交易所 open orders、成交回报和持仓快照。</span>
+        </div>
+        <div class="step">
+          <strong>3. Chase Engine</strong>
+          <span class="small muted">下同向最优价限价单；订单不在最优价时撤单重挂。</span>
+        </div>
+        <div class="step">
+          <strong>4. Protection Watcher</strong>
+          <span class="small muted">本地监控止盈止损触发价，触发后创建平仓追单任务。</span>
+        </div>
+        <div class="step">
+          <strong>5. Recovery</strong>
+          <span class="small muted">重启后从交易所订单、持仓和本地文件恢复未完成任务。</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>已确认决策</h2>
+      <div class="grid three">
+        <div class="decision recommend">
+          <h3>下单价格</h3>
+          <p class="small">
+            同向价挂单买卖：<code>BUY</code> 走买侧排队，<code>SELL</code> 走卖侧排队。首版继续使用 Binance <code>priceMatch=QUEUE</code>，不显式传入价格。
+          </p>
+        </div>
+        <div class="decision recommend">
+          <h3>保护单</h3>
+          <p class="small">
+            TP/SL 暂时只支持固定价格，触发价格源使用 <code>markPrice</code>。数据结构预留百分比、ATR、移动止损等扩展字段。保护触发后的订单必须只用于平仓。
+          </p>
+        </div>
+        <div class="decision recommend">
+          <h3>产品形态</h3>
+          <p class="small">
+            首版只做 CLI + 本地长驻服务，不做图形 UI。order window 先服务于 CLI 查询、日志和状态恢复。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Order Window 数据草案</h2>
+      <div class="mock-window">
+        <div>
+          <div class="metric-row">
+            <div class="metric"><span>Symbol</span><b>XAGUSDT</b></div>
+            <div class="metric"><span>Bid / Ask</span><b>78.290 / 78.300</b></div>
+            <div class="metric"><span>Spread</span><b>0.010</b></div>
+            <div class="metric"><span>Data Age</span><b>122 ms</b></div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>字段</th>
+                <th>含义</th>
+                <th>建议来源</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>market</code></td>
+                <td>最新 bid、ask、mid、spread、更新时间、窗口统计。</td>
+                <td>WebSocket <code>bookTicker</code></td>
+              </tr>
+              <tr>
+                <td><code>orders</code></td>
+                <td>交易所 open orders、本地下单意图、撤单重挂次数、剩余数量。</td>
+                <td>REST 查询 + 本地任务状态</td>
+              </tr>
+              <tr>
+                <td><code>fills</code></td>
+                <td>成交片段、均价、累计成交量、手续费预留字段。</td>
+                <td>订单查询或用户数据流</td>
+              </tr>
+              <tr>
+                <td><code>position</code></td>
+                <td>持仓方向、数量、entry、mark、unrealized pnl。</td>
+                <td>position risk / account stream</td>
+              </tr>
+              <tr>
+                <td><code>protections</code></td>
+                <td>本地 TP/SL 计划列表、每笔逻辑仓位的触发状态、触发后平仓追单任务。</td>
+                <td>本地状态文件 + 实时价格</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="panel soft">
+          <h3>窗口不是只看盘口</h3>
+          <p class="small">
+            这里的 order window 建议定义为“某个 symbol 的交易运行态视图”，不仅保存 bid/ask，也保存订单、成交、持仓和保护单的聚合状态。这样 Go 重构后可以同时支撑 CLI、日志、后续 UI 和故障恢复。
+          </p>
+          <div class="callout warn small">
+            已确认窗口大小：首版按时间保留最近 60 秒，同时限制最多 1000 条 bookTicker 更新，避免极端行情下内存无界增长。
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>多笔订单与多套保护</h2>
+      <p>
+        首版支持同一 symbol + 同一持仓方向下存在多笔本地逻辑仓位，例如 <code>XAGUSDT LONG</code> 可以分三次买入，每一笔都有自己的固定 TP/SL。需要注意：Binance 交易所侧的 Hedge Mode 持仓仍是聚合持仓，本地工具负责把多笔 entry 维护成多个 <code>ProtectionPlan</code>。
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>对象</th>
+            <th>首版语义</th>
+            <th>关键字段</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>交易所持仓</td>
+            <td>按 <code>symbol + positionSide</code> 聚合，例如只有一个 <code>XAGUSDT LONG</code> 总持仓。</td>
+            <td><code>positionAmt</code>、<code>entryPrice</code>、<code>markPrice</code></td>
+          </tr>
+          <tr>
+            <td>本地逻辑仓位</td>
+            <td>每次 entry chase task 形成一条本地 plan，可拥有独立 TP/SL。</td>
+            <td><code>planId</code>、<code>entryTaskId</code>、<code>protectedQty</code>、<code>takeProfit</code>、<code>stopLoss</code></td>
+          </tr>
+          <tr>
+            <td>触发平仓</td>
+            <td>某个 plan 触发 TP/SL 时，只按该 plan 的 <code>protectedQty</code> 发起只平仓追单。</td>
+            <td><code>exitTaskId</code>、<code>triggerType</code>、<code>triggerPrice</code></td>
+          </tr>
+          <tr>
+            <td>并发策略</td>
+            <td>同一 <code>symbol + positionSide</code> 默认只允许一个开仓追单任务处于主动 chasing；已成交形成的保护 plan 可以有多个。</td>
+            <td><code>activeEntryTask</code>、<code>plans[]</code></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout warn small" style="margin-top: 12px;">
+        设计取舍：多套保护计划是首版范围；同方向多个开仓追单同时 chasing 暂不作为默认能力。这样可以支持你分批买多并设置不同 TP/SL，同时避免两个同向追单在盘口变化时同时撤单重挂，放大限频风险。
+      </div>
+    </section>
+
+    <section class="grid two">
+      <div class="panel">
+        <h2>同向最优价追单规则</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>动作</th>
+              <th>候选同向价</th>
+              <th>用途</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>BUY</code></td>
+              <td><code>bestBid</code></td>
+              <td>买单挂在买一，偏 maker 排队。</td>
+            </tr>
+            <tr>
+              <td><code>SELL</code></td>
+              <td><code>bestAsk</code></td>
+              <td>卖单挂在卖一，偏 maker 排队。</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout small" style="margin-top: 12px;">
+          该项已确认：首版按 maker 同向排队价理解，不采用更激进的对手价。当前 Python 里 <code>BUY -> ask</code>、<code>SELL -> bid</code> 的比较写法不作为 Go 重写的目标语义。
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>订单自动切换规则</h2>
+        <p>
+          订单创建后进入 <code>Chasing</code> 状态。订单状态由用户数据流里的 <code>ORDER_TRADE_UPDATE</code> 驱动；“是否不再最优”由 <code>bookTicker</code> 的 bid / ask 更新驱动。两者合并后再决定是否 cancel-replace。
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>场景</th>
+              <th>动作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>未成交，价格不再最优</td>
+              <td>撤单后用剩余数量重挂。</td>
+            </tr>
+            <tr>
+              <td>部分成交，价格不再最优</td>
+              <td>只对剩余数量重挂，累计成交写入窗口。</td>
+            </tr>
+            <tr>
+              <td>撤单失败或订单已消失</td>
+              <td>立即 reconcile，判断是成交、取消还是异常。</td>
+            </tr>
+            <tr>
+              <td>超过最大等待时间</td>
+              <td>按配置选择撤单退出或继续保护性追单。</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout warn small" style="margin-top: 12px;">
+          结论：只靠订单订阅信息不够，因为订单事件只能告诉我们订单状态变化，不能告诉我们盘口最优价已经移动。首版应使用“行情事件触发价格检查 + 订单事件触发状态机 + 慢速 watchdog reconcile”的混合模型。
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Binance 限频约束</h2>
+      <p>
+        首版需要内置本地 token bucket，并读取响应头动态降速。当前官方约束里，新订单会计入 <code>X-MBX-ORDER-COUNT-10S</code> 和 <code>X-MBX-ORDER-COUNT-1M</code>；撤单接口自身也有请求权重。服务收到 <code>429</code> 必须退避，持续不退避会触发 <code>418</code> 自动封禁。
+      </p>
+      <p class="small muted">
+        本次查询 <code>/fapi/v1/exchangeInfo</code> 返回的 USD-M Futures 限频为：<code>ORDERS 300 / 10s</code>、<code>ORDERS 1200 / 1m</code>、<code>REQUEST_WEIGHT 2400 / 1m</code>。这些值实现时应启动读取，不写死。
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>项目</th>
+            <th>首版建议</th>
+            <th>原因</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>触发方式</td>
+            <td>行情事件驱动，但同一订单重挂需 debounce。</td>
+            <td>避免 bookTicker 高频变化导致 REST 下单风暴。</td>
+          </tr>
+          <tr>
+            <td>单订单最小重挂间隔</td>
+            <td>默认 <code>1000ms</code>，配置允许调到 <code>500ms</code>，不建议更低。</td>
+            <td>每次重挂至少包含撤单和新下单，且新下单计入订单限频。</td>
+          </tr>
+          <tr>
+            <td>全局预算</td>
+            <td>默认不超过官方订单限频的 20%，并以响应头为准动态收缩。</td>
+            <td>给手工操作、网络重试、其他工具和峰值波动留余量。</td>
+          </tr>
+          <tr>
+            <td>异常处理</td>
+            <td><code>429</code> 立即指数退避；<code>418</code> 停止交易请求并报警。</td>
+            <td>避免被判断为持续违反限频。</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="small muted" style="margin-top: 10px;">
+        参考：Binance USD-M Futures 官方文档的 New Order、Cancel Order、Order Update、Book Ticker Streams 和 General Info / Limits 页面。实现前仍应通过 <code>exchangeInfo</code> 读取实时限频配置。
+      </p>
+    </section>
+
+    <section class="panel">
+      <h2>本地止盈止损规则</h2>
+      <div class="grid three">
+        <div class="decision recommend">
+          <h3>触发方式</h3>
+          <p class="small">
+            TP/SL 不再下 Binance 条件单，而是保存为本地 <code>ProtectionPlan</code>。订阅 <code>markPrice</code>，实时价格达到触发条件后，生成一个只平仓的 <code>ChaseTask</code>。
+          </p>
+        </div>
+        <div class="decision recommend">
+          <h3>部分成交保护</h3>
+          <p class="small">
+            一旦开仓追单出现部分成交，就按累计已成交数量创建或更新保护计划。首版只维护聚合数量，不做逐笔成交明细保护。
+          </p>
+        </div>
+        <div class="decision required">
+          <h3>关键风险</h3>
+          <p class="small">
+            本地 TP/SL 在程序退出、断网、机器休眠时不会被交易所自动执行，因此必须设计恢复、告警和可选的 failsafe。
+          </p>
+        </div>
+      </div>
+
+      <div class="callout warn small" style="margin-top: 14px;">
+        注意：如果首版继续沿用 Hedge Mode，Binance 新订单参数里 <code>reduceOnly</code> 不能和 Hedge Mode 一起发送。实现上应通过 <code>positionSide=LONG + SELL</code>、<code>positionSide=SHORT + BUY</code>、数量不超过当前持仓等规则保证只平仓；如果未来支持 One-way Mode，再使用 <code>reduceOnly=true</code>。
+      </div>
+
+      <table style="margin-top: 14px;">
+        <thead>
+          <tr>
+            <th>持仓</th>
+            <th>TP 触发</th>
+            <th>SL 触发</th>
+            <th>触发后交易</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>LONG</code></td>
+            <td>价格大于等于 <code>takeProfit</code></td>
+            <td>价格小于等于 <code>stopLoss</code></td>
+            <td><code>SELL</code> 平多，再按同向价追单。</td>
+          </tr>
+          <tr>
+            <td><code>SHORT</code></td>
+            <td>价格小于等于 <code>takeProfit</code></td>
+            <td>价格大于等于 <code>stopLoss</code></td>
+            <td><code>BUY</code> 平空，再按同向价追单。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout small" style="margin-top: 12px;">
+        部分成交保护的首版语义：开仓任务成交 <code>3/10</code> 时，保护数量就是 <code>3</code>；后续成交到 <code>5/10</code>，保护数量更新为 <code>5</code>。若 TP/SL 被触发，先取消开仓剩余挂单，再对当前受保护数量发起只平仓追单，避免一边平仓一边继续开仓。
+      </div>
+    </section>
+
+    <section class="grid two">
+      <div class="panel">
+        <h2>Go 模块划分草案</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>模块</th>
+              <th>职责</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>cmd/trader</code></td>
+              <td>CLI 入口：启动服务、提交任务、查询窗口、取消任务。</td>
+            </tr>
+            <tr>
+              <td><code>internal/binance</code></td>
+              <td>REST 签名请求、WebSocket 连接、交易所精度规则。</td>
+            </tr>
+            <tr>
+              <td><code>internal/window</code></td>
+              <td>维护 symbol 级 order window 聚合状态。</td>
+            </tr>
+            <tr>
+              <td><code>internal/chase</code></td>
+              <td>同向价下单、订单状态机、cancel-replace 策略。</td>
+            </tr>
+            <tr>
+              <td><code>internal/protection</code></td>
+              <td>本地 TP/SL 监控、触发、互斥和恢复。</td>
+            </tr>
+            <tr>
+              <td><code>internal/store</code></td>
+              <td>首版推荐 JSONL 事件日志 + 原子 JSON 快照，支撑崩溃恢复；SQLite 作为后续多查询维度扩展。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <h2>状态机草案</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>状态</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>Pending</code></td>
+              <td>任务已创建，等待行情、精度和账户校验。</td>
+            </tr>
+            <tr>
+              <td><code>Placed</code></td>
+              <td>订单已提交到交易所，记录 orderId 和目标价。</td>
+            </tr>
+            <tr>
+              <td><code>Chasing</code></td>
+              <td>监控最优价变化，必要时撤单重挂。</td>
+            </tr>
+            <tr>
+              <td><code>PartiallyFilled</code></td>
+              <td>已部分成交，继续追剩余数量，并按累计成交数量创建或更新本地保护计划。</td>
+            </tr>
+            <tr>
+              <td><code>Filled</code></td>
+              <td>全部成交；若为开仓则创建本地保护计划。</td>
+            </tr>
+            <tr>
+              <td><code>Triggered</code></td>
+              <td>TP/SL 已触发，创建平仓追单任务。</td>
+            </tr>
+            <tr>
+              <td><code>Done</code> / <code>Failed</code></td>
+              <td>任务结束或进入人工处理队列。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>核心问题确认状态</h2>
+      <div class="status-line">
+        <span>确认进度</span>
+        <strong id="check-count">0 / 12</strong>
+      </div>
+      <div class="checklist" id="checklist">
+        <label class="check confirmed"><input type="checkbox" checked disabled> <span>已定：“同向价”按 <code>BUY=bestBid</code>、<code>SELL=bestAsk</code> 的同侧排队语义实现。</span></label>
+        <label class="check confirmed"><input type="checkbox" checked disabled> <span>已定：继续使用 Binance <code>priceMatch=QUEUE</code>，首版不显式传入价格。</span></label>
+        <label class="check confirmed"><input type="checkbox" checked disabled> <span>已定：TP/SL 首版只支持固定价格，结构预留百分比、ATR 等扩展。</span></label>
+        <label class="check confirmed"><input type="checkbox" checked disabled> <span>已定：本地 TP/SL 的触发价格源使用 <code>markPrice</code>。</span></label>
+        <label class="check confirmed"><input type="checkbox" checked disabled> <span>已定：TP/SL 触发后必须只平仓；Hedge Mode 下通过方向、仓位侧和数量约束保证。</span></label>
+        <label class="check confirmed"><input type="checkbox" checked disabled> <span>已定：部分成交后立即按累计已成交数量创建或更新聚合保护计划。</span></label>
+        <label class="check confirmed"><input type="checkbox" checked disabled> <span>已定：同一 symbol + positionSide 支持多笔本地保护计划，每笔可有不同 TP/SL。</span></label>
+        <label class="check confirmed"><input type="checkbox" checked disabled> <span>已定：本地保护计划需要落盘；推荐 JSONL 事件日志 + 原子 JSON 快照。</span></label>
+        <label class="check confirmed"><input type="checkbox" checked disabled> <span>已定：程序重启发现裸持仓时进入 <code>NeedsProtection</code>，不自动猜 TP/SL。</span></label>
+        <label class="check confirmed"><input type="checkbox" checked disabled> <span>已评估：追单不能只靠订单订阅；采用 bookTicker 行情事件 + 订单事件 + 慢速 watchdog。</span></label>
+        <label class="check confirmed"><input type="checkbox" checked disabled> <span>已定方向：重挂需内置 token bucket、debounce、响应头监控和 429/418 退避。</span></label>
+        <label class="check confirmed"><input type="checkbox" checked disabled> <span>已定：首版只支持 Hedge Mode 的 <code>LONG</code> / <code>SHORT</code>。</span></label>
+        <label class="check confirmed"><input type="checkbox" checked disabled> <span>已定：首版只做 CLI + 本地服务，不做图形 UI。</span></label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>实现前细节选择</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>细节</th>
+            <th>建议首版默认</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>CLI 命令形态</td>
+            <td><code>chaser serve</code>、<code>chaser order</code>、<code>chaser window</code>、<code>chaser protect</code>、<code>chaser cancel</code>。</td>
+            <td>首版需要先把命令名和参数结构定下来，避免后续文档和实现互相牵扯。</td>
+          </tr>
+          <tr>
+            <td>状态文件位置</td>
+            <td>默认 <code>~/.binance-chase-trader/state/</code>，支持通过配置覆盖。</td>
+            <td>需要兼容 Windows 和 Linux；状态文件不要放仓库目录，避免误提交。</td>
+          </tr>
+          <tr>
+            <td>配置文件格式</td>
+            <td>首版用 TOML 或 YAML 二选一；若追求 Go 标准库最少依赖，可用 JSON。</td>
+            <td>配置会承载环境、symbol 列表、限频预算、dry-run/testnet/live 等运行参数。</td>
+          </tr>
+          <tr>
+            <td>真实交易保护</td>
+            <td>默认 <code>dry-run</code>；测试网用 <code>--testnet</code>；实盘必须显式 <code>--live</code>。</td>
+            <td>工具会自动撤单重挂和平仓，实盘入口必须故意且清楚。</td>
+          </tr>
+          <tr>
+            <td>手工改仓处理</td>
+            <td>发现交易所持仓和本地保护数量不一致时，进入 <code>NeedsReconcile</code> 并暂停自动新增动作。</td>
+            <td>用户可能在 Binance 前端手工平仓或改仓，服务不能盲目按旧本地状态继续交易。</td>
+          </tr>
+          <tr>
+            <td>多笔同向保护的扣减规则</td>
+            <td>工具自己触发的平仓按 <code>planId</code> 精确扣减；外部手工减仓导致数量不一致时进入 <code>NeedsReconcile</code>。</td>
+            <td>交易所不会帮我们区分“这是第几笔 LONG”，本地只能对自己发出的 exit task 做确定归属。</td>
+          </tr>
+          <tr>
+            <td>同向开仓追单并发</td>
+            <td>默认同一 <code>symbol + positionSide</code> 串行开仓追单；上一笔进入 protected/done 后再允许下一笔。</td>
+            <td>既能支持多笔 LONG 保护，又能控制撤单重挂频率，首版更稳。</td>
+          </tr>
+          <tr>
+            <td>日志粒度</td>
+            <td>默认输出人类可读日志，同时将事件写入 JSONL。</td>
+            <td>人类日志方便盯盘，JSONL 方便恢复、排障和后续 UI 读取。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="grid two">
+      <div class="panel">
+        <h2>建议首版范围</h2>
+        <ul>
+          <li>Go 单进程服务，支持多个 symbol 的实时 order window。</li>
+          <li>CLI 提交开仓、平仓、取消、查询窗口。</li>
+          <li>同向价 chase order，支持部分成交和自动重挂。</li>
+          <li>本地 TP/SL 监控，使用 <code>markPrice</code> 触发，触发后走同一套 chase engine 平仓。</li>
+          <li>同一 symbol + positionSide 支持多笔本地保护计划，每笔可设置不同固定 TP/SL。</li>
+          <li>部分成交立即按累计已成交数量建立聚合保护；触发保护时先撤剩余开仓单，再平受保护数量。</li>
+          <li>本地状态落盘和启动 reconcile，避免本地保护任务丢失。</li>
+          <li>内置 Binance 限频保护，响应头接近阈值时自动降速。</li>
+        </ul>
+      </div>
+
+      <div class="panel">
+        <h2>暂不建议首版承诺</h2>
+        <ul>
+          <li>复杂策略引擎或自动开仓信号。</li>
+          <li>多交易所抽象。</li>
+          <li>Web Dashboard。</li>
+          <li>同一 symbol + positionSide 下多个开仓追单任务同时 chasing。</li>
+          <li>完全替代交易所风控。尤其是本地 TP/SL 断线风险，不能在文档里弱化。</li>
+          <li>高频抢单级别的毫秒优化。首版应先保证状态正确和可恢复。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>验收口径草案</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>类别</th>
+            <th>验收条件</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Order Window</td>
+            <td>能稳定展示每个 symbol 的行情、open orders、聚合持仓、多笔保护计划、数据 age 和最近状态变化。</td>
+          </tr>
+          <tr>
+            <td>下单追单</td>
+            <td>下单后如果目标同向最优价变化，自动撤单并用剩余数量重挂；部分成交不会重复下已成交数量。</td>
+          </tr>
+          <tr>
+            <td>本地 TP/SL</td>
+            <td>触发价达到后不调用 Binance 条件单，而是按对应 plan 的受保护数量创建只平仓追单任务，并沿用同向价自动切换逻辑。</td>
+          </tr>
+          <tr>
+            <td>恢复</td>
+            <td>服务重启后能 reconcile 交易所 open orders 和 position，并提示缺失保护计划的持仓。</td>
+          </tr>
+          <tr>
+            <td>安全</td>
+            <td>所有真实下单默认需要显式确认或配置开关；提供 testnet / dry-run 模式作为首选验证路径。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    const checklist = document.querySelector("#checklist");
+    const counter = document.querySelector("#check-count");
+
+    function updateCount() {
+      const inputs = Array.from(checklist.querySelectorAll("input"));
+      const checked = inputs.filter((input) => input.checked).length;
+      counter.textContent = `${checked} / ${inputs.length}`;
+    }
+
+    checklist.addEventListener("change", updateCount);
+    updateCount();
+  </script>
+</body>
+</html>

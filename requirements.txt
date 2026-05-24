@@ -1,2 +1,0 @@
-# 纯 Python 标准库实现，无外部依赖
-# 运行时 asyncio 需要 Python >= 3.10

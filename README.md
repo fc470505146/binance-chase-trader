@@ -1,195 +1,153 @@
-# 🍗 binance-chase-trader
+# binance-chase-trader
 
-**Binance USDⓈ-M Futures 最优价格下单工具**
+Binance USD-M Futures 同向价追单工具。当前版本已重写为 Go：本地服务维护 order window，CLI 提交开仓/查询/取消任务，成交后由本地保护计划监控固定 TP/SL，并在触发时使用同向价追单平仓。
 
-QUEUE 限价 + 实时追单 + 自动 ATR 止盈止损。纯 Python 标准库，零外部依赖。
+## 核心语义
 
-## 工作原理
+- 同向价挂单：`BUY` 使用买侧排队，`SELL` 使用卖侧排队。
+- 下单继续使用 Binance `priceMatch=QUEUE`，不显式传入 `price`。
+- TP/SL 首版只支持固定价格，触发源使用 `markPrice`。
+- TP/SL 不使用 Binance 条件单，由本地服务实时监控，触发后创建只平仓追单。
+- 首版只支持 Hedge Mode 的 `LONG` / `SHORT`。
+- 同一 `symbol + positionSide` 支持多笔本地保护计划，每笔可有不同 TP/SL。
+- 同一 `symbol + positionSide` 默认只允许一个开仓追单任务正在 chasing，避免多个同向任务同时撤单重挂放大限频风险。
+- 默认 `dry-run`，不会真实下单；实盘必须显式启动 `--env live`。
 
-```
-┌─────────────────────────────────┐
-│   ws-data-daemon (常驻后台)     │
-│  ─────────────────────────────  │
-│  🔗 Binance WS @bookTicker      │
-│  📦 内存：最新盘口 + 滑动窗口    │
-│  🏠 Unix socket 对外提供查询     │
-└────────────┬────────────────────┘
-             │ DEPTH <sym> → b1/a1
-             ▼
-┌─────────────────────────────────┐
-│   chase_order.py (按需调用)      │
-│  ─────────────────────────────  │
-│  1️⃣ socket 查当前排队价          │
-│  2️⃣ REST 挂 QUEUE 限价单 (maker) │
-│  3️⃣ 每 0.5s socket 查价 → 变了   │
-│     就撤单重挂                   │
-│  4️⃣ 成交 → ATR 止盈止损          │
-└─────────────────────────────────┘
-```
+## 构建
 
-**为什么用 QUEUE 限价？**
-- Maker 费率 0.02% vs Taker 0.04%，省一半手续费
-- `priceMatch: "QUEUE"` 自动挂在同向最优价
-- 5 分钟 K 线震荡期内大概率成交
-
-## 安装
-
-### 1. 克隆
-
-```bash
-git clone https://github.com/YOUR_USERNAME/binance-chase-trader.git
-cd binance-chase-trader
-```
-
-### 2. 配置 API Key
-
-```bash
-cp .env.example .env
-# 编辑 .env，填入你的 Binance API Key
-```
-
-**安全提醒：** `.env` 已被 `.gitignore` 排除，永远不会提交到 Git。
-
-### 3. 安装
-
-```bash
-pip install -e .
-```
-
-## 快速开始
-
-### 启动数据守护进程
-
-```bash
-# 前台启动（调试用）
-python -m binance_chase daemon
-
-# 后台 systemd 服务
-sudo bash scripts/install_service.sh
-sudo systemctl start binance-chase-daemon
-```
-
-### 查守护进程状态
-
-```bash
-python -m binance_chase status
-# {
-#   "symbols": {
-#     "XAGUSDT": {"bid": 78.29, "ask": 78.30, "connected": true, ...},
-#     "XAUUSDT": {"bid": 4555.10, "ask": 4555.11, ...}
-#   },
-#   "uptime": 1234.56
-# }
-```
-
-### 查实时盘口
-
-```bash
-python -m binance_chase depth XAGUSDT
-# XAGUSDT: bid=78.29 ask=78.30
-```
-
-### 开仓（QUEUE限价 + 追单 + 自动止盈止损）
-
-```bash
-# 做空 XAGUSDT，1张，SHORT
-python -m binance_chase trade XAGUSDT SELL 1 SHORT
-
-# 做多 XAUUSDT，0.079张，LONG
-python -m binance_chase trade XAUUSDT BUY 0.079 LONG
-```
-
-### 平仓
-
-```bash
-python -m binance_chase trade XAGUSDT SELL 1 LONG --close
-# 平多仓：自动清除存量条件单，成交即结束
-```
-
-### 查持仓
-
-```bash
-python -m binance_chase pos
-# XAGUSDT SHORT: 1张 @78.50 标记价78.30 盈亏+0.20 USDT
-
-python -m binance_chase pos XAGUSDT  # 只看特定品种
-```
-
-## Python API
-
-```python
-from binance_chase import daemon, trader, api
-
-# 启动守护进程
-daemon.run(symbols=["XAGUSDT", "XAUUSDT"])
-
-# 开仓
-result = trader.place_limit(
-    symbol="XAGUSDT",
-    side="SELL",
-    qty=1,
-    pos_side="SHORT",
-    verbose=True,
-)
-
-# 平仓
-result = trader.place_limit(
-    symbol="XAGUSDT",
-    side="SELL",
-    qty=1,
-    pos_side="LONG",
-    close=True,
-)
-
-# 查持仓
-pos = api.has_position("XAGUSDT")
-if pos:
-    print(f"{pos['side']} {pos['amt']}张 @${pos['entry']} 盈亏{pos['pnl']}")
-
-# 手动查盘口
-bid, ask = trader.get_book_top_ws("XAGUSDT")
+```powershell
+go mod tidy
+go build -o .\bin\chaser.exe .\cmd\chaser
 ```
 
 ## 配置
 
+复制 `.env.example` 为 `.env`，按需填写：
+
+```powershell
+Copy-Item .env.example .env
+notepad .env
+```
+
+常用环境变量：
+
 | 变量 | 默认值 | 说明 |
-|:----|:------|:-----|
-| `BINANCE_API_KEY` | — | Binance API Key (必填) |
-| `BINANCE_SECRET_KEY` | — | Binance Secret Key (必填) |
-| `BINANCE_SOCKET_PATH` | `/tmp/ws_data.sock` | Unix socket 路径 |
-| 交易对 | `XAGUSDT`, `XAUUSDT` | 可在 `daemon.run(symbols=[...])` 中自定义 |
+|:--|:--|:--|
+| `BINANCE_API_KEY` | 空 | testnet/live 模式必填 |
+| `BINANCE_SECRET_KEY` | 空 | testnet/live 模式必填 |
+| `CHASER_ENV` | `dry-run` | `dry-run` / `testnet` / `live` |
+| `BINANCE_DAEMON_HOST` | `127.0.0.1` | 本地控制服务地址 |
+| `BINANCE_DAEMON_PORT` | `8765` | 本地控制服务端口 |
+| `CHASER_SYMBOLS` | `XAGUSDT,XAUUSDT` | 逗号分隔的订阅交易对 |
+| `CHASER_STATE_DIR` | `~/.binance-chase-trader/state` | JSON 快照和 JSONL 事件日志目录 |
+| `CHASER_REPLACE_MIN_INTERVAL_MS` | `1000` | 同一订单最小重挂间隔 |
+| `CHASER_ORDER_BUDGET_RATIO` | `0.2` | 使用 Binance 订单限频的预算比例 |
 
-**`.env` 查找优先级：** 当前目录 → `~/.binance-chase/.env` → `~/.hermes/.env`
+## 快速开始
 
-## 项目结构
+启动本地服务：
 
-```
-binance-chase-trader/
-├── src/binance_chase/
-│   ├── __init__.py       # 包信息
-│   ├── __main__.py       # CLI 入口
-│   ├── config.py          # .env 读取 + 配置
-│   ├── api.py             # Binance API 封装 (签名/公开)
-│   ├── daemon.py          # WS 数据守护进程
-│   └── trader.py          # QUEUE 限价追单 + 止盈止损
-├── scripts/
-│   └── install_service.sh # systemd 服务安装
-├── .env.example           # 配置模板
-├── .gitignore
-├── pyproject.toml
-├── requirements.txt
-├── LICENSE
-└── README.md
+```powershell
+.\bin\chaser.exe serve --env dry-run --symbols XAGUSDT,XAUUSDT
 ```
 
-## 依赖
+提交一笔做多追单，固定止盈 80、止损 76：
 
-**零外部依赖。** 只用 Python 标准库：
-- `asyncio` — WebSocket + Unix socket 服务
-- `hmac` / `hashlib` — Binance API 签名
-- `urllib` — REST API 请求
-- `json` / `socket` / `struct` — 数据序列化与传输
+```powershell
+.\bin\chaser.exe order XAGUSDT BUY 3 LONG --tp 80 --sl 76
+```
 
-## 免责声明
+查询窗口：
 
-本项目仅供学习和研究。加密货币期货交易具有高风险，可能导致全部资金损失。使用前请充分了解风险。
+```powershell
+.\bin\chaser.exe window XAGUSDT
+```
+
+查询任务和保护计划：
+
+```powershell
+.\bin\chaser.exe tasks
+.\bin\chaser.exe plans
+```
+
+取消任务：
+
+```powershell
+.\bin\chaser.exe cancel <taskId>
+```
+
+## 运行模型
+
+```text
+bookTicker + markPrice streams
+          |
+          v
+   order window
+   - bid / ask / mid / markPrice
+   - open chase tasks
+   - local protection plans
+   - recent tick history
+          |
+          +--> chase engine
+          |    priceMatch=QUEUE
+          |    cancel-replace with rate limit guard
+          |
+          +--> protection watcher
+               fixed TP/SL by markPrice
+               trigger -> close-only chase task
+```
+
+订单状态由 Binance user data stream 的 `ORDER_TRADE_UPDATE` 驱动；盘口是否仍在同向最优价由 `bookTicker` 驱动；本地服务还会周期性 reconcile 持仓和本地保护计划。
+
+## 多笔本地保护计划
+
+Binance 交易所侧同一个 `symbol + positionSide` 是聚合持仓。本工具在本地维护多笔逻辑保护计划：
+
+```text
+XAGUSDT LONG 聚合持仓：10
+
+plan A：3 张，TP=80，SL=76
+plan B：2 张，TP=82，SL=77
+plan C：5 张，TP=85，SL=75
+```
+
+如果 plan B 的 TP 先触发，工具只对 plan B 的 2 张发起只平仓追单。交易所看到的是 `XAGUSDT LONG` 减少 2 张，本地工具将 plan B 标记为关闭。
+
+如果用户在 Binance 前端手工改仓，导致交易所聚合持仓和本地保护数量不一致，服务会进入 `NeedsReconcile` / `NeedsProtection` 类状态，不自动猜 TP/SL。
+
+## 限频保护
+
+服务启动时读取 Binance `exchangeInfo` 中的 `ORDERS` 限频，并按 `CHASER_ORDER_BUDGET_RATIO` 设置本地 token bucket。下单/撤单后还会读取响应头：
+
+- `X-MBX-ORDER-COUNT-10S`
+- `X-MBX-ORDER-COUNT-1M`
+- `X-MBX-USED-WEIGHT-1M`
+
+当订单计数接近阈值，服务会自动降速；遇到 `429` / `418` 会把交易请求预算降到最低。
+
+## 状态文件
+
+默认状态目录：
+
+```text
+~/.binance-chase-trader/state/
+```
+
+文件：
+
+- `snapshot.json`：当前窗口、任务、保护计划快照。
+- `events.jsonl`：事件日志，用于排障和后续 UI/回放。
+
+## 需求确认稿
+
+需求确认 HTML 保存在：
+
+```text
+docs/order-window-go-rewrite-requirements.html
+```
+
+## 风险说明
+
+本地 TP/SL 不是 Binance 托管条件单。程序退出、断网、机器休眠时，本地保护不会自动执行。使用 live 模式前必须理解这一点，并先用 dry-run/testnet 验证。
+
+本项目仅供学习和研究。加密货币期货交易具有高风险，可能导致全部资金损失。
