@@ -42,6 +42,7 @@ notepad .env
 | `CHASER_STATE_DIR` | `~/.binance-chase-trader/state` | JSON 快照和 JSONL 事件日志目录 |
 | `CHASER_REPLACE_MIN_INTERVAL_MS` | `1000` | 同一订单最小重挂间隔 |
 | `CHASER_ORDER_BUDGET_RATIO` | `0.2` | 使用 Binance 订单限频的预算比例 |
+| `CHASER_PROTECTION_MAX_DISTANCE_PCT` | `0.5` | TP/SL 相对当前 `markPrice` 的最大允许偏离比例 |
 
 ## 快速开始
 

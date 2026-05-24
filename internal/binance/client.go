@@ -84,6 +84,18 @@ type PositionRisk struct {
 	UnRealizedPNL string `json:"unRealizedProfit"`
 }
 
+type PremiumIndex struct {
+	Symbol     string `json:"symbol"`
+	MarkPrice  string `json:"markPrice"`
+	IndexPrice string `json:"indexPrice"`
+	Time       int64  `json:"time"`
+}
+
+type BookTop struct {
+	Bid float64
+	Ask float64
+}
+
 func NewClient(cfg config.Config) *Client {
 	return &Client{
 		cfg: cfg,
@@ -165,6 +177,35 @@ func (c *Client) Positions(ctx context.Context, symbol string) ([]PositionRisk, 
 	var out []PositionRisk
 	err := c.signed(ctx, http.MethodGet, "/fapi/v2/positionRisk", params, &out)
 	return out, err
+}
+
+func (c *Client) PremiumIndex(ctx context.Context, symbol string) (PremiumIndex, error) {
+	params := url.Values{}
+	params.Set("symbol", strings.ToUpper(symbol))
+	var out PremiumIndex
+	err := c.public(ctx, http.MethodGet, "/fapi/v1/premiumIndex", params, &out)
+	return out, err
+}
+
+func (c *Client) BookTop(ctx context.Context, symbol string) (BookTop, error) {
+	params := url.Values{}
+	params.Set("symbol", strings.ToUpper(symbol))
+	params.Set("limit", "5")
+	var out struct {
+		Bids [][]string `json:"bids"`
+		Asks [][]string `json:"asks"`
+	}
+	if err := c.public(ctx, http.MethodGet, "/fapi/v1/depth", params, &out); err != nil {
+		return BookTop{}, err
+	}
+	top := BookTop{}
+	if len(out.Bids) > 0 && len(out.Bids[0]) > 0 {
+		top.Bid, _ = strconv.ParseFloat(out.Bids[0][0], 64)
+	}
+	if len(out.Asks) > 0 && len(out.Asks[0]) > 0 {
+		top.Ask, _ = strconv.ParseFloat(out.Asks[0][0], 64)
+	}
+	return top, nil
 }
 
 func (c *Client) StartListenKey(ctx context.Context) (string, error) {

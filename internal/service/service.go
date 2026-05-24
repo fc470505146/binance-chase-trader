@@ -80,6 +80,7 @@ func New(cfg config.Config) (*Service, error) {
 
 func (s *Service) Run(ctx context.Context) error {
 	s.configureRateLimits(ctx)
+	s.hydrateInitialMarkets(ctx)
 	s.streams.RunMarket(ctx, s.cfg.Symbols, s.OnMarket)
 	s.streams.RunUser(ctx, s.OnOrderUpdate)
 
@@ -137,6 +138,10 @@ func (s *Service) SubmitEntry(ctx context.Context, req domain.OrderRequest) (dom
 	}
 
 	s.mu.Lock()
+	if err := s.validateProtectionPricesLocked(req); err != nil {
+		s.mu.Unlock()
+		return domain.OrderResult{}, err
+	}
 	if s.hasActiveEntryLocked(req.Symbol, req.PositionSide) {
 		s.mu.Unlock()
 		return domain.OrderResult{}, fmt.Errorf("%s %s 已有开仓追单在途，首版同向开仓追单串行执行", req.Symbol, req.PositionSide)
@@ -566,6 +571,28 @@ func (s *Service) configureRateLimits(ctx context.Context) {
 	}
 }
 
+func (s *Service) hydrateInitialMarkets(ctx context.Context) {
+	for _, symbol := range s.cfg.Symbols {
+		premium, err := s.client.PremiumIndex(ctx, symbol)
+		if err != nil {
+			log.Printf("初始化 markPrice 失败 %s: %v", symbol, err)
+		}
+		book, bookErr := s.client.BookTop(ctx, symbol)
+		if bookErr != nil {
+			log.Printf("初始化盘口失败 %s: %v", symbol, bookErr)
+		}
+		mark := parseFloat(premium.MarkPrice)
+		s.OnMarket(domain.MarketSnapshot{
+			Symbol:    strings.ToUpper(symbol),
+			Bid:       book.Bid,
+			Ask:       book.Ask,
+			MarkPrice: mark,
+			EventTime: time.UnixMilli(premium.Time),
+			UpdatedAt: time.Now(),
+		})
+	}
+}
+
 func (s *Service) adaptOrderBudget() {
 	usage := s.client.LastRateUsage()
 	if usage.StatusCode == 0 {
@@ -679,6 +706,56 @@ func (s *Service) targetPriceLocked(symbol string, side domain.Side) float64 {
 		return market.Bid
 	}
 	return market.Ask
+}
+
+func (s *Service) validateProtectionPricesLocked(req domain.OrderRequest) error {
+	market := s.markets[req.Symbol]
+	ref := market.MarkPrice
+	if ref <= 0 {
+		return fmt.Errorf("%s markPrice 尚未就绪，无法校验 TP/SL，暂不允许提交本地保护单", req.Symbol)
+	}
+	if err := s.validateProtectionDistance(req.Symbol, "止盈", req.TakeProfit, ref); err != nil {
+		return err
+	}
+	if err := s.validateProtectionDistance(req.Symbol, "止损", req.StopLoss, ref); err != nil {
+		return err
+	}
+	switch req.PositionSide {
+	case domain.PositionLong:
+		if req.TakeProfit <= ref {
+			return fmt.Errorf("LONG 止盈 %.8g 必须高于当前 markPrice %.8g，否则会立刻触发", req.TakeProfit, ref)
+		}
+		if req.StopLoss >= ref {
+			return fmt.Errorf("LONG 止损 %.8g 必须低于当前 markPrice %.8g，否则会立刻触发", req.StopLoss, ref)
+		}
+	case domain.PositionShort:
+		if req.TakeProfit >= ref {
+			return fmt.Errorf("SHORT 止盈 %.8g 必须低于当前 markPrice %.8g，否则会立刻触发", req.TakeProfit, ref)
+		}
+		if req.StopLoss <= ref {
+			return fmt.Errorf("SHORT 止损 %.8g 必须高于当前 markPrice %.8g，否则会立刻触发", req.StopLoss, ref)
+		}
+	}
+	return nil
+}
+
+func (s *Service) validateProtectionDistance(symbol string, label string, price float64, ref float64) error {
+	if s.cfg.MaxProtectionDistancePct <= 0 {
+		return nil
+	}
+	distance := math.Abs(price-ref) / ref
+	if distance > s.cfg.MaxProtectionDistancePct {
+		return fmt.Errorf(
+			"%s %s %.8g 距当前 markPrice %.8g 过远，偏离 %.2f%%，超过限制 %.2f%%；如确需使用请调大 CHASER_PROTECTION_MAX_DISTANCE_PCT",
+			symbol,
+			label,
+			price,
+			ref,
+			distance*100,
+			s.cfg.MaxProtectionDistancePct*100,
+		)
+	}
+	return nil
 }
 
 func (s *Service) hasActiveEntryLocked(symbol string, side domain.PositionSide) bool {

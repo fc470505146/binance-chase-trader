@@ -20,19 +20,20 @@ const (
 )
 
 type Config struct {
-	APIKey             string
-	SecretKey          string
-	Environment        Environment
-	RESTBaseURL        string
-	WSBaseURL          string
-	Host               string
-	Port               int
-	Symbols            []string
-	StateDir           string
-	WindowDuration     time.Duration
-	WindowMaxTicks     int
-	ReplaceMinInterval time.Duration
-	OrderBudgetRatio   float64
+	APIKey                   string
+	SecretKey                string
+	Environment              Environment
+	RESTBaseURL              string
+	WSBaseURL                string
+	Host                     string
+	Port                     int
+	Symbols                  []string
+	StateDir                 string
+	WindowDuration           time.Duration
+	WindowMaxTicks           int
+	ReplaceMinInterval       time.Duration
+	OrderBudgetRatio         float64
+	MaxProtectionDistancePct float64
 }
 
 func Load() (Config, error) {
@@ -43,17 +44,18 @@ func Load() (Config, error) {
 	env := Environment(getEnv("CHASER_ENV", getEnv("BINANCE_ENV", string(EnvDryRun))))
 
 	cfg := Config{
-		APIKey:             getEnv("BINANCE_API_KEY", ""),
-		SecretKey:          getEnv("BINANCE_SECRET_KEY", ""),
-		Environment:        env,
-		Host:               getEnv("BINANCE_DAEMON_HOST", "127.0.0.1"),
-		Port:               getEnvInt("BINANCE_DAEMON_PORT", 8765),
-		Symbols:            splitSymbols(getEnv("CHASER_SYMBOLS", "XAGUSDT,XAUUSDT")),
-		StateDir:           getEnv("CHASER_STATE_DIR", stateDir),
-		WindowDuration:     time.Duration(getEnvInt("CHASER_WINDOW_SECONDS", 60)) * time.Second,
-		WindowMaxTicks:     getEnvInt("CHASER_WINDOW_MAX_TICKS", 1000),
-		ReplaceMinInterval: time.Duration(getEnvInt("CHASER_REPLACE_MIN_INTERVAL_MS", 1000)) * time.Millisecond,
-		OrderBudgetRatio:   getEnvFloat("CHASER_ORDER_BUDGET_RATIO", 0.2),
+		APIKey:                   getEnv("BINANCE_API_KEY", ""),
+		SecretKey:                getEnv("BINANCE_SECRET_KEY", ""),
+		Environment:              env,
+		Host:                     getEnv("BINANCE_DAEMON_HOST", "127.0.0.1"),
+		Port:                     getEnvInt("BINANCE_DAEMON_PORT", 8765),
+		Symbols:                  splitSymbols(getEnv("CHASER_SYMBOLS", "XAGUSDT,XAUUSDT")),
+		StateDir:                 getEnv("CHASER_STATE_DIR", stateDir),
+		WindowDuration:           time.Duration(getEnvInt("CHASER_WINDOW_SECONDS", 60)) * time.Second,
+		WindowMaxTicks:           getEnvInt("CHASER_WINDOW_MAX_TICKS", 1000),
+		ReplaceMinInterval:       time.Duration(getEnvInt("CHASER_REPLACE_MIN_INTERVAL_MS", 1000)) * time.Millisecond,
+		OrderBudgetRatio:         getEnvFloat("CHASER_ORDER_BUDGET_RATIO", 0.2),
+		MaxProtectionDistancePct: getEnvFloat("CHASER_PROTECTION_MAX_DISTANCE_PCT", 0.5),
 	}
 
 	if err := cfg.Finalize(); err != nil {
@@ -82,6 +84,9 @@ func (c *Config) Finalize() error {
 	}
 	if c.OrderBudgetRatio <= 0 || c.OrderBudgetRatio > 1 {
 		c.OrderBudgetRatio = 0.2
+	}
+	if c.MaxProtectionDistancePct <= 0 {
+		c.MaxProtectionDistancePct = 0.5
 	}
 	return nil
 }

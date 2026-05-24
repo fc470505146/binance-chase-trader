@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -163,7 +164,7 @@ func callAndPrint(addr string, command string, payload any) error {
 		return err
 	}
 	if !resp.OK {
-		return fmt.Errorf(resp.Error)
+		return errors.New(resp.Error)
 	}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")

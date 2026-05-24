@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -45,7 +44,7 @@ func (s *Streams) runMarket(ctx context.Context, symbols []string, handler Marke
 		streams = append(streams, lower+"@bookTicker")
 		streams = append(streams, lower+"@markPrice@1s")
 	}
-	endpoint := s.cfg.WSBaseURL + "/stream?streams=" + url.QueryEscape(strings.Join(streams, "/"))
+	endpoint := s.cfg.WSBaseURL + "/stream?streams=" + strings.Join(streams, "/")
 
 	for ctx.Err() == nil {
 		conn, _, err := websocket.DefaultDialer.Dial(endpoint, nil)
